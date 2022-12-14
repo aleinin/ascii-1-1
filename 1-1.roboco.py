@@ -1,12 +1,10 @@
-from time import sleep, perf_counter
-import keyboard
-from tkinter import *
+from time import sleep
 
 ### Constants ###
 MAP = [
     {
         "row": 0,
-        "default_tile": "a",
+        "default_tile": "b",
         "tile_exceptions": {}
     },
     {
@@ -308,7 +306,6 @@ IMAGE_WIDTH = TILE_WIDTH * TILE_PIXEL_WIDTH
 VIEW_WIDTH = 26
 START_VIEW = [0, VIEW_WIDTH]
 END_VIEW = [TILE_WIDTH - VIEW_WIDTH, TILE_WIDTH]
-MAX_TIME = 400
 ### Player States
 JUMPING = "JUMPING"
 APEX = "APEX"
@@ -321,8 +318,6 @@ PLAYER = "play"
 FLAG = "f"
 FLAG_POLE = "fp"
 HARD_BLOCK = "h"
-QUESTION = "q"
-BRICK = "b"
 DOOR = "d"
 ### GAME STATE
 IN_PROGRESS = "IN PROGRESS"
@@ -343,89 +338,6 @@ Mutates in this context is referring to a method that either does not return, or
 or more of the inputs
 """
 
-nominal_to_full_width_translation = str.maketrans(
-    '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&()*+,-./:;<=>?@[]^_`{|}~',
-    '０１２３４５６７８９ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ！゛＃＄％＆（）＊＋、ー。／：；〈＝〉？＠［］＾＿‘｛｜｝～')
-
-
-def full_width(nominal_str):
-    """Functional: Translate nominal strings (like this) into ｆｕｌｌ ｗｉｄｔｈ variants"""
-    return nominal_str.translate(nominal_to_full_width_translation).replace(" ", "　")
-
-
-class Driver:
-    """Hosts the implementation details between the desktop TK version and the RoboCo version"""
-    _draw_fn = None
-    _is_key_pressed_fn = None
-
-    def __init__(self, draw_fn, is_key_pressed_fn):
-        self._draw_fn = draw_fn
-        self._is_key_pressed_fn = is_key_pressed_fn
-
-    def draw(self, frame):
-        self._draw_fn(frame)
-
-    def is_input_pressed(self, key):
-        return self._is_key_pressed_fn(key)
-
-
-class Banner:
-    _name = "ROBIO"
-    _score = 0
-    _num_coins = 0
-    _world = "1-1"
-    _time_left = MAX_TIME
-
-    def __init__(self):
-        self._start_time = perf_counter()
-        self._subsection_len, self._remainder = divmod(VIEW_WIDTH, 4)
-
-    def check_time(self):
-        time_since_start = int(perf_counter() - self._start_time)
-        time_left = MAX_TIME - time_since_start
-        self._time_left = time_left
-        if time_left <= 0:
-            raise GameOverException
-
-    def add_coin(self):
-        self._score += COIN_WORTH
-        self._num_coins += 1
-
-    def _spaced(self, label, align="LEFT"):
-        fill_spaces = (self._subsection_len - len(label)) * " "
-        if align == "CENTER":
-            half_num, rem_num = divmod(len(fill_spaces), 2)
-            half = half_num * " "
-            rem = rem_num * " "
-            return "{}{}{}{}".format(half, label, rem, half)
-        if align == "LEFT":
-            return "{}{}".format(label, fill_spaces)
-        else:  # RIGHT
-            return "{}{}".format(fill_spaces, label)
-
-    def get_top_line(self):
-        top_line = ""
-        top_line += self._spaced(self._name)
-        top_line += self._remainder * " "
-        top_line += self._spaced("")
-        top_line += self._spaced("WORLD")
-        top_line += self._spaced("TIME")
-        return full_width(top_line + "\n")
-
-    def get_bottom_line(self):
-        bottom_line = ""
-        bottom_line += self._spaced("{:06d}".format(self._score))
-        bottom_line += self._remainder * " "
-        bottom_line += self._spaced("Ox{:02d}".format(self._num_coins))
-        bottom_line += self._spaced("1-1", "CENTER")
-        bottom_line += self._spaced(" " + str(self._time_left))
-        return full_width(bottom_line + "\n")
-
-    def get_banner(self):
-        return self.get_top_line() + self.get_bottom_line()
-
-class Entity:
-
 
 def init():
     """Functional: initializes the tile grid using the provided map and tile_to_pixel dictionary. Also initializes
@@ -445,32 +357,7 @@ def init():
             "velocity": [0, 0]  # x, y
         },
         "enemies": [],
-        "objects": {
-            "blocks": [
-                {
-                    "type": "coin",
-                    "amount": 1,
-                    "strong": False,
-                    "tile": QUESTION,
-                    "coordinates": [16, 8]
-                },
-                {
-                    "type": "brick",
-                    "amount": None,
-                    "strong": True,
-                    "tile": BRICK,
-                    "coordinates": [20, 8]
-                },
-                {
-                    "type": "prize",
-                    "amount": 1,
-                    "prize"
-                    "strong": True,
-                    "tile": BRICK,
-                    "coordinates": [20, 8]
-                }
-            ]
-        }
+        "objects": []
     }
     return tile_grid, sprites, tile_to_pixel
 
@@ -770,10 +657,9 @@ def generate_tile_row(row):
     return row
 
 
-### RENDER ###
-def render(tile_grid, view, tile_to_pixel, banner):
+def render(tile_grid, view, tile_to_pixel):
     image_pixels = convert_tiles_to_pixels(tile_grid, tile_to_pixel)
-    frame = ""
+    line = ""
     for row in image_pixels:
         tile_start = view[0]
         tile_end = view[1]
@@ -782,13 +668,10 @@ def render(tile_grid, view, tile_to_pixel, banner):
         render_row = row[pixel_start:pixel_end]
         row_text = ''.join(render_row)
         row_text += '\n'
-        frame += row_text
-    frame = banner.get_banner() + frame
-    return frame
+        line += row_text
+    return line
 
 
-
-### END RENDER ###
 ### PLAYER ACTIONS ###
 def move_left(player):
     v_x, v_y = player["velocity"]
@@ -930,39 +813,87 @@ def run_to_right(grid, sprites):
     return new_sprites, state
 
 
+# class Timer:
+#     measurement_types = []
+#     _frames = []
+#     _frame = []
+#
+#     def __init__(self, measurement_types):
+#         self.measurement_types = measurement_types
+#
+#     def time(self):
+#         self._frame.append(perf_counter_ns())
+#         if len(self._frame) == len(self.measurement_types):
+#             self._frames.append(self._frame)
+#             self._frame = []
+#
+#     def get_time(self):
+#         deltas = []
+#         for frame in self._frames:
+#             delta = []
+#             for i, measurement in enumerate(frame):
+#                 if i == 0:
+#                     delta.append(0)
+#                 else:
+#                     delta.append(measurement - frame[i-1])
+#             deltas.append(delta)
+#         print_times = {}
+#         for i in range(1, len(deltas[0])):
+#             times_list = list(map(lambda j: j[i], deltas))
+#             times_avg = sum(times_list) / len(times_list)
+#             times_avg = round(times_avg / 1000000, 4)
+#             print_times[self.measurement_types[i]] = "{}{}".format(times_avg, "ms")
+#         print()
+
+
+
 ### END HANDLE GAME WON
 
-# def draw_banner():
-#     name = "Roboio"
-#     world = "1-1"
-#     time
-# goomba worth 100
-# mushroom worth 1000
-# flower woth 1000
-# flag worth 5000
-# coin worth 200 points
-# 100 coins => new life
-COIN_WORTH = 200
-FLAG_WORTH = 5000
+## driver
+
+def write_to_file(image_pixels):
+    with open("image.txt", "w", encoding="utf-8") as file:
+        for row in image_pixels:
+            row_text = ''.join(row)
+            file.write(row_text)
+            file.write('\n')
+        file.close()
 
 
-### GAME LOOP
-def game_loop(driver: Driver, fps):
+def main():
+    # timer = Timer(["start", "draw_sprites", "update_view", "render", "debug",
+    #                "root update", "check inside", "check falling", "handle movement", "update player"])
+    game_loop()
+    # timer.get_time()
+
+    # end tk stuff
+
+
+def game_loop():
+    fps = 15
     sleep_time = 1 / fps
     view = START_VIEW
     static_grid, sprites, tile_to_pixel = init()
+    # IN_PROGRESS, GAME_WON, GAME_OVER
     game_state = IN_PROGRESS
+    # None, LOWER_FLAG, RUN_TO_RIGHT, FINISH
     won_state = None
-    banner = Banner()
     while True:
         try:
-            if game_state is  IN_PROGRESS:
-                banner.check_time()
             frame_grid = draw_sprites(static_grid, sprites)
             view = update_view(sprites["player"], view)
-            frame = render(frame_grid, view, tile_to_pixel, banner)
-            # frame = debug(sprites, frame)
-            driver.draw(frame)
+            frame = render(frame_grid, view, tile_to_pixel)
+            ### DEBUG
+            player_state = sprites["player"]["state"]
+            player_velocity = sprites["player"]["velocity"]
+            velo = "[{},{}]".format(player_velocity[0], player_velocity[1])
+            while len(player_state) + len(velo) < 15:
+                velo += "@"
+            frame = player_state + velo + frame[15:]
+            ###  Render Impl (varies from tk to RoboCo ###
+            frame_text.set(frame)
+            root.update()
+            ### End Render Impl
             if game_state is IN_PROGRESS:
                 if check_for_game_won(frame_grid, sprites["player"]):
                     game_state = GAME_WON
@@ -972,12 +903,13 @@ def game_loop(driver: Driver, fps):
                     sprites = check_inside_block(static_grid, sprites)
                     sprites = check_for_falling(frame_grid, sprites)
                     sprites = handle_movement(frame_grid, sprites, view)
-                    sprites = update_player_with_inputs(driver, sprites)
+                    sprites = update_player_with_inputs(sprites)
                     sleep(sleep_time)
             elif game_state is GAME_WON:
                 if won_state is TALLY:
                     sleep(1)
-                    driver.draw("You win!")
+                    frame_text.set("You win!")
+                    root.update()
                     sleep(5)
                     break
                 else:
@@ -987,7 +919,8 @@ def game_loop(driver: Driver, fps):
                         sprites, won_state = run_to_right(frame_grid, sprites)
                     sprites = handle_cutscene_movement(frame_grid, sprites)
             else:
-                driver.draw("Game over!")
+                frame_text.set("Game over!")
+                root.update()
                 sleep(5)
                 break
         except GameOverException:
@@ -996,47 +929,16 @@ def game_loop(driver: Driver, fps):
 
 
 ### Impl varies from RoboCo to tk###
-def update_player_with_inputs(driver: Driver, sprites):
+def update_player_with_inputs(sprites):
     new_dict = copy_dict(sprites)
     new_player = new_dict["player"]
-    if driver.is_input_pressed("w"):
+    if keyboard.is_pressed("w"):
         jump(new_player)
-    if driver.is_input_pressed("d"):
+    if keyboard.is_pressed("d"):
         move_right(new_player)
-    if driver.is_input_pressed("a"):
+    if keyboard.is_pressed("a"):
         move_left(new_player)
     return new_dict
-
-
-def debug(sprites, frame):
-    player_state = sprites["player"]["state"]
-    player_velocity = sprites["player"]["velocity"]
-    velo = "[{},{}]".format(player_velocity[0], player_velocity[1])
-    while len(player_state) + len(velo) < 15:
-        velo += "@"
-    frame = player_state + velo + frame[15:]
-    return frame
-
-
-## END GAME LOOP
-
-## driver
-def main():
-    fps = 15
-    root = Tk()
-    label = Label(root)
-    label.pack()
-    frame_text = StringVar()
-    label = Label(root, textvariable=frame_text, font=("Times", "18"), fg='blue')
-    label.pack()
-
-    def screen_writer_fn(frame):
-        frame_text.set(frame)
-        root.update()
-
-    is_key_pressed_fn = lambda key: keyboard.is_pressed(key)
-    driver = Driver(screen_writer_fn, is_key_pressed_fn)
-    game_loop(driver, fps)
 
 
 if __name__ == '__main__':
