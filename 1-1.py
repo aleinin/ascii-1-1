@@ -298,6 +298,36 @@ MAP = [
         }
     }
 ]
+
+
+WIN_SCREEN = """＜　　　　＼　　　　／　　　　　　　　　　　　　　＞
+＜　　　　　＼　　／　　　　　　　　　　　　　　　＞
+＜　　　　　　｜｜　　｜＝＝｜　｜　　｜　　　　　＞
+＜　　　　　　｜｜　　｜　　｜　｜　　｜　　　　　＞
+＜　　　　　　｜｜　　｜　　｜　｜　　｜　　　　　＞
+＜　／＼　　　｜｜　　｜＝＝｜　｜＝＝｜　　／＼　＞
+＜／　　＼　　　　　　　　　　　　　　　　／　　＼＞
+＜＼　　／　　　　　　　　　　　　　　　　＼　　／＞
+＜　＼／　　｜　　　　｜　｟｠　　　　　　　＼／　＞
+＜　　　　　｜　　　　｜　　　　　　　　　　　　　＞
+＜　　　　　｜　　　　｜　｜｜　｜＼　　　｜　　　＞
+＜　　　　　｜　　　　｜　｜｜　｜　＼　　｜　　　＞
+＜　　　　　｜　／＼　｜　｜｜　｜　　＼　｜　　　＞
+＜　　　　　｜／　　＼｜　｜｜　｜　　　＼｜　　　＞"""
+GAME_OVER_SCREEN = """＜　　　　　　　　　　　　　　　　　　　　　　　　＞
+＜　｜＝＝＝＝　　　　　　　　　　　　｜＝＝＝　　＞
+＜　｜　　　　　　　　　　　｜＼／｜　｜　　　　　＞
+＜　｜　　＝｜　　／＼　　　｜　　｜　｜＝　　　　＞
+＜　｜　　　｜　／＝＝＼　　｜　　｜　｜　　　　　＞
+＜　｜＝＝＝＝／　　　　＼　｜　　｜　｜＝＝＝　　＞
+＜　　　　　　　　　　　　　　　　　　　　　　　　＞
+＜　　　　　　　　　　　　　　　　　　　　　　　　＞
+＜　｜＝＝＝｜　　　　　　｜＝＝＝　　｜　＝＝　　＞
+＜　｜　　　｜　｜　　｜　｜　　　　　｜／　　　　＞
+＜　｜　　　｜　｜　　｜　｜＝　　　　｜　　　　　＞
+＜　｜　　　｜　＼　　／　｜　　　　　｜　　　　　＞
+＜　｜＝＝＝｜　　＼／　　｜＝＝＝　　｜　　　　　＞
+＜　　　　　　　　　　　　　　　　　　　　　　　　＞"""
 PLAYER_STARTING_COORDINATES = [2, 11]
 TILE_HEIGHT = 14
 TILE_WIDTH = 212
@@ -424,8 +454,6 @@ class Banner:
     def get_banner(self):
         return self.get_top_line() + self.get_bottom_line()
 
-class Entity:
-
 
 def init():
     """Functional: initializes the tile grid using the provided map and tile_to_pixel dictionary. Also initializes
@@ -479,8 +507,8 @@ def init():
 def draw_sprites(static_grid, sprites):
     """Functional: adds sprites to the static_grid and returns an updated grid"""
     tile_grid_with_sprites = copy_list(static_grid)
-    draw_objects(sprites["objects"], tile_grid_with_sprites)
-    draw_enemies(sprites["enemies"], tile_grid_with_sprites)
+    # draw_objects(sprites["objects"], tile_grid_with_sprites)
+    # draw_enemies(sprites["enemies"], tile_grid_with_sprites)
     draw_player(sprites["player"], tile_grid_with_sprites)
     draw_flag(sprites["flag"], tile_grid_with_sprites)
     return tile_grid_with_sprites
@@ -961,7 +989,7 @@ def game_loop(driver: Driver, fps):
             frame_grid = draw_sprites(static_grid, sprites)
             view = update_view(sprites["player"], view)
             frame = render(frame_grid, view, tile_to_pixel, banner)
-            # frame = debug(sprites, frame)
+            frame = debug(sprites, frame)
             driver.draw(frame)
             if game_state is IN_PROGRESS:
                 if check_for_game_won(frame_grid, sprites["player"]):
@@ -977,7 +1005,7 @@ def game_loop(driver: Driver, fps):
             elif game_state is GAME_WON:
                 if won_state is TALLY:
                     sleep(1)
-                    driver.draw("You win!")
+                    driver.draw(WIN_SCREEN)
                     sleep(5)
                     break
                 else:
@@ -987,7 +1015,7 @@ def game_loop(driver: Driver, fps):
                         sprites, won_state = run_to_right(frame_grid, sprites)
                     sprites = handle_cutscene_movement(frame_grid, sprites)
             else:
-                driver.draw("Game over!")
+                driver.draw(GAME_OVER_SCREEN)
                 sleep(5)
                 break
         except GameOverException:
@@ -1010,17 +1038,21 @@ def update_player_with_inputs(driver: Driver, sprites):
 
 def debug(sprites, frame):
     player_state = sprites["player"]["state"]
-    player_velocity = sprites["player"]["velocity"]
-    velo = "[{},{}]".format(player_velocity[0], player_velocity[1])
-    while len(player_state) + len(velo) < 15:
-        velo += "@"
-    frame = player_state + velo + frame[15:]
+    vx, vy = sprites["player"]["velocity"]
+    x, y = sprites["player"]["coordinates"]
+    frame = frame + "\n" + player_state + " v: [{}, {}] c: [{}, {}]".format(vx, vy, x, y)
     return frame
 
 
 ## END GAME LOOP
 
-## driver
+######################################
+# Python TK Driver
+######################################
+# from time import sleep, perf_counter
+# import keyboard
+# from tkinter import *
+
 def main():
     fps = 15
     root = Tk()
@@ -1041,3 +1073,41 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+######################################
+# RoboCo Driver
+######################################
+# from inputs import *
+# from controllables import *
+# from sensors import *
+# from scriptruntime import *
+# from ports import *
+# from color import *
+# from math import tau
+# from time import sleep
+# input_stream_a = Input.stream("a")
+# input_stream_d = Input.stream("d")
+# input_stream_w = Input.stream("w")
+#
+# def main():
+#     screen = init_screen()
+#     fps = 15
+#     def screen_writer_fn(frame):
+#         screen.text = frame
+#     is_key_pressed_fn = lambda key: Input.pressed(key)
+#     driver = Driver(screen_writer_fn, is_key_pressed_fn)
+#     game_loop(driver, fps)
+#
+# def init_screen():
+#     screen = TextScreen(0)
+#     screen.horizontal_alignment = TextScreen.HorizontalAlignment.LEFT
+#     screen.vertical_alignment = TextScreen.VerticalAlignment.MIDDLE
+#     screen.auto_size = False
+#     screen.size = 70
+#     return screen
+#
+#
+# if __name__ == "__main__":
+#     main()
+#
+
